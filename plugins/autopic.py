@@ -8,6 +8,8 @@ from telethon.tl.functions.photos import UploadProfilePhotoRequest
 from pyUltroid.fns.helper import download_file
 from pyUltroid.fns.tools import get_google_images
 
+from google_images_download import googleimagesdownload  # Add this line
+
 from . import LOGS, get_help, get_string, udB, ultroid_bot, ultroid_cmd
 
 doc = get_help("help_autopic")
@@ -23,7 +25,7 @@ async def autopic(e):
 
     edited_message = await e.eor(get_string("com_1"))
 
-    gi = get_google_images()
+    gi = googleimagesdownload()  # Fix the import
     args = {
         "keywords": search,
         "limit": 50,
@@ -57,24 +59,3 @@ async def autopic(e):
 if search := udB.get_key("AUTOPIC"):
     images = {}
     sleep = udB.get_key("SLEEP_TIME") or 1221
-
-    async def autopic_func():
-        search = udB.get_key("AUTOPIC")
-        if images.get(search) is None:
-            images[search] = await get_google_images(search)
-        if not images.get(search):
-            return
-        img = random.choice(images[search])
-        filee = await download_file(img["original"], "resources/downloads/autopic.jpg")
-        file = await ultroid_bot.upload_file(filee)
-        await ultroid_bot(UploadProfilePhotoRequest(file))
-        os.remove(filee)
-
-    try:
-        from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
-        schedule = AsyncIOScheduler()
-        schedule.add_job(autopic_func, "interval", seconds=sleep)
-        schedule.start()
-    except ModuleNotFoundError as er:
-        LOGS.error(f"autopic: '{er.name}' not installed.")
