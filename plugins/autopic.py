@@ -4,6 +4,7 @@
 # This file is a part of < https://github.com/TeamUltroid/Ultroid/ >
 # PLease read the GNU Affero General Public License in
 # <https://www.github.com/TeamUltroid/Ultroid/blob/main/LICENSE/>.
+# Fixed by @ShreeVasudevKrsna 
 
 
 import asyncio
@@ -18,7 +19,7 @@ from pyUltroid.fns.tools import get_google_images
 
 from . import LOGS, get_help, get_string, udB, ultroid_bot, ultroid_cmd
 
-__doc__ = get_help("help_autopic")
+doc = get_help("help_autopic")
 
 
 @ultroid_cmd(pattern="autopic( (.*)|$)")
