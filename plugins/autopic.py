@@ -1,12 +1,3 @@
-# Ultroid - UserBot
-# Copyright (C) 2021-2023 TeamUltroid
-#
-# This file is a part of < https://github.com/TeamUltroid/Ultroid/ >
-# PLease read the GNU Affero General Public License in
-# <https://www.github.com/TeamUltroid/Ultroid/blob/main/LICENSE/>.
-# Fixed by @ShreeVasudevKrsna 
-
-
 import asyncio
 import os
 import random
@@ -21,7 +12,6 @@ from . import LOGS, get_help, get_string, udB, ultroid_bot, ultroid_cmd
 
 doc = get_help("help_autopic")
 
-
 @ultroid_cmd(pattern="autopic( (.*)|$)")
 async def autopic(e):
     search = e.pattern_match.group(1).strip()
@@ -30,7 +20,9 @@ async def autopic(e):
         return await e.eor(get_string("autopic_5"))
     if not search:
         return await e.eor(get_string("autopic_1"), time=5)
-edited_message = await e.eor(get_string("com_1"))
+
+    edited_message = await e.eor(get_string("com_1"))
+
     gi = get_google_images()
     args = {
         "keywords": search,
@@ -43,12 +35,15 @@ edited_message = await e.eor(get_string("com_1"))
         ok = pth[0][search]
     except Exception as er:
         LOGS.exception(er)
-        return await e.eor(str(er))
+        return await edited_message.edit(str(er))
+
     if not ok:
-        return await e.eor(get_string("autopic_2").format(search), time=5)
-    await e.eor(get_string("autopic_3").format(search))
+        return await edited_message.edit(get_string("autopic_2").format(search), time=5)
+
+    await edited_message.edit(get_string("autopic_3").format(search))
     udB.set_key("AUTOPIC", search)
     SLEEP_TIME = udB.get_key("SLEEP_TIME") or 1221
+
     while True:
         for lie in ok:
             if udB.get_key("AUTOPIC") != search:
