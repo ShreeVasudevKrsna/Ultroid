@@ -30,7 +30,7 @@ async def autopic(e):
         return await e.eor(get_string("autopic_5"))
     if not search:
         return await e.eor(get_string("autopic_1"), time=5)
-    e = await e.eor(get_string("com_1"))
+edited_message = await e.eor(get_string("com_1"))
     gi = googleimagesdownload()
     args = {
         "keywords": search,
