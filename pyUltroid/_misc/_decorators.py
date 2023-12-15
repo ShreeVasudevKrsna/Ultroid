@@ -109,8 +109,90 @@ def ultroid_cmd(
                     get_string("py_d4").format(HNDLR),
                     time=10,
                 )
-            try:
-                await dec(ult)
+          async def wrapp(ult):
+    if not ult.out:
+        if owner_only:
+            return
+        if ult.sender_id not in owner_and_sudos():
+            return
+        if ult.sender_id in _ignore_eval:
+            return await eod(
+                ult,
+                get_string("py_d1"),
+            )
+        if fullsudo and ult.sender_id not in SUDO_M.fullsudos:
+            return await eod(ult, get_string("py_d2"), time=15)
+    chat = ult.chat
+    if hasattr(chat, "title"):
+        if (
+            "#noub" in chat.title.lower()
+            and not (chat.admin_rights or chat.creator)
+            and not (ult.sender_id in DEVLIST)
+        ):
+            return
+    if ult.is_private and (groups_only or admins_only):
+        return await eod(ult, get_string("py_d3"))
+    elif admins_only and not (chat.admin_rights or chat.creator):
+        return await eod(ult, get_string("py_d5"))
+    if only_devs and not udB.get_key("I_DEV"):
+        return await eod(
+            ult,
+            get_string("py_d4").format(HNDLR),
+            time=10,
+        )
+    try:
+        await dec(ult)
+    except FloodWaitError as fwerr:
+        await asst.send_message(
+            udB.get_key("LOG_CHANNEL"),
+            f"`FloodWaitError:\n{str(fwerr)}\n\nSleeping for {tf((fwerr.seconds + 10) * 1000)}`",
+        )
+        await asyncio.sleep(fwerr.seconds + 10)  # Sleep for the required duration
+        await ultroid_bot.connect()
+        await asst.send_message(
+            udB.get_key("LOG_CHANNEL"),
+            "`Bot is working again`",
+        )
+        return
+    except ChatSendInlineForbiddenError:
+        return await eod(ult, "`Inline Locked In This Chat.`")
+    except (ChatSendMediaForbiddenError, ChatSendStickersForbiddenError):
+        return await eod(ult, get_string("py_d8"))
+    except (BotMethodInvalidError, UserIsBotError):
+        return await eod(ult, get_string("py_d6"))
+    except AlreadyInConversationError:
+        return await eod(
+            ult,
+            get_string("py_d7"),
+        )
+    except (BotInlineDisabledError, DependencyMissingError) as er:
+        return await eod(ult, f"`{er}`")
+    except (
+        MessageIdInvalidError,
+        MessageNotModifiedError,
+        MessageDeleteForbiddenError,
+    ) as er:
+        LOGS.exception(er)
+    except AuthKeyDuplicatedError as er:
+        LOGS.exception(er)
+        await asst.send_message(
+            udB.get_key("LOG_CHANNEL"),
+            "Session String expired, create new session from 👇",
+            buttons=[
+                Button.url("Bot", "t.me/SessionGeneratorBot?start="),
+                Button.url(
+                    "Repl",
+                    "https://replit.com/@TheUltroid/UltroidStringSession",
+                ),
+            ],
+        )
+        sys.exit()
+    except events.StopPropagation:
+        raise events.StopPropagation
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        LOGS.exception(e)
             except FloodWaitError as fwerr:
                 await asst.send_message(
                     udB.get_key("LOG_CHANNEL"),
