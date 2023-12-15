@@ -1,5 +1,5 @@
 # Ultroid - UserBot
-# Copyright (C) 2021-2023 TeamUltroid
+# Copyright (C) 2021-2022 TeamUltroid
 #
 # This file is a part of < https://github.com/TeamUltroid/Ultroid/ >
 # PLease read the GNU Affero General Public License in
@@ -10,10 +10,11 @@ import inspect
 import re
 import sys
 from io import BytesIO
+from functools import wraps
 from pathlib import Path
 from time import gmtime, strftime
 from traceback import format_exc
-from google_images_download import googleimagesdownload
+
 from telethon import Button
 from telethon import __version__ as telever
 from telethon import events
@@ -31,12 +32,8 @@ from telethon.errors.rpcerrorlist import (
     MessageNotModifiedError,
     UserIsBotError,
 )
-from google_images_download import googleimagesdownload
 from telethon.events import MessageEdited, NewMessage
 from telethon.utils import get_display_name
-
-from pyUltroid.exceptions import DependencyMissingError
-from strings import get_string
 
 from .. import *
 from .. import _ignore_eval
@@ -50,8 +47,14 @@ from ..version import ultroid_version as ult_ver
 from . import SUDO_M, owner_and_sudos
 from ._wrappers import eod
 
+from strings import get_string
+from pyUltroid.exceptions import DependencyMissingError
+
+
 MANAGER = udB.get_key("MANAGER")
 TAKE_EDITS = udB.get_key("TAKE_EDITS")
+TAKE_SUDO_EDITS = udB.get_key("TAKE_SUDO_EDITS")
+TAKE_ASST_EDITS = udB.get_key("TAKE_ASST_EDITS")
 black_list_chats = udB.get_key("BLACKLIST_CHATS")
 allow_sudo = SUDO_M.should_allow_sudo
 
@@ -78,6 +81,7 @@ def ultroid_cmd(
     func = kwargs.get("func", lambda e: not e.via_bot_id)
 
     def decor(dec):
+        @wraps(dec)
         async def wrapp(ult):
             if not ult.out:
                 if owner_only:
@@ -91,6 +95,11 @@ def ultroid_cmd(
                     )
                 if fullsudo and ult.sender_id not in SUDO_M.fullsudos:
                     return await eod(ult, get_string("py_d2"), time=15)
+
+            if isinstance(ult, MessageEdited.Event) and getattr(
+                ult.message, "edit_hide", None
+            ):
+                return
             chat = ult.chat
             if hasattr(chat, "title"):
                 if (
@@ -99,108 +108,32 @@ def ultroid_cmd(
                     and not (ult.sender_id in DEVLIST)
                 ):
                     return
+
             if ult.is_private and (groups_only or admins_only):
                 return await eod(ult, get_string("py_d3"))
             elif admins_only and not (chat.admin_rights or chat.creator):
                 return await eod(ult, get_string("py_d5"))
+
             if only_devs and not udB.get_key("I_DEV"):
                 return await eod(
                     ult,
                     get_string("py_d4").format(HNDLR),
                     time=10,
                 )
-          async def wrapp(ult):
-    if not ult.out:
-        if owner_only:
-            return
-        if ult.sender_id not in owner_and_sudos():
-            return
-        if ult.sender_id in _ignore_eval:
-            return await eod(
-                ult,
-                get_string("py_d1"),
-            )
-        if fullsudo and ult.sender_id not in SUDO_M.fullsudos:
-            return await eod(ult, get_string("py_d2"), time=15)
-    chat = ult.chat
-    if hasattr(chat, "title"):
-        if (
-            "#noub" in chat.title.lower()
-            and not (chat.admin_rights or chat.creator)
-            and not (ult.sender_id in DEVLIST)
-        ):
-            return
-    if ult.is_private and (groups_only or admins_only):
-        return await eod(ult, get_string("py_d3"))
-    elif admins_only and not (chat.admin_rights or chat.creator):
-        return await eod(ult, get_string("py_d5"))
-    if only_devs and not udB.get_key("I_DEV"):
-        return await eod(
-            ult,
-            get_string("py_d4").format(HNDLR),
-            time=10,
-        )
-    try:
-        await dec(ult)
-    except FloodWaitError as fwerr:
-        await asst.send_message(
-            udB.get_key("LOG_CHANNEL"),
-            f"`FloodWaitError:\n{str(fwerr)}\n\nSleeping for {tf((fwerr.seconds + 10) * 1000)}`",
-        )
-        await asyncio.sleep(fwerr.seconds + 10)  # Sleep for the required duration
-        await ultroid_bot.connect()
-        await asst.send_message(
-            udB.get_key("LOG_CHANNEL"),
-            "`Bot is working again`",
-        )
-        return
-    except ChatSendInlineForbiddenError:
-        return await eod(ult, "`Inline Locked In This Chat.`")
-    except (ChatSendMediaForbiddenError, ChatSendStickersForbiddenError):
-        return await eod(ult, get_string("py_d8"))
-    except (BotMethodInvalidError, UserIsBotError):
-        return await eod(ult, get_string("py_d6"))
-    except AlreadyInConversationError:
-        return await eod(
-            ult,
-            get_string("py_d7"),
-        )
-    except (BotInlineDisabledError, DependencyMissingError) as er:
-        return await eod(ult, f"`{er}`")
-    except (
-        MessageIdInvalidError,
-        MessageNotModifiedError,
-        MessageDeleteForbiddenError,
-    ) as er:
-        LOGS.exception(er)
-    except AuthKeyDuplicatedError as er:
-        LOGS.exception(er)
-        await asst.send_message(
-            udB.get_key("LOG_CHANNEL"),
-            "Session String expired, create new session from 👇",
-            buttons=[
-                Button.url("Bot", "t.me/SessionGeneratorBot?start="),
-                Button.url(
-                    "Repl",
-                    "https://replit.com/@TheUltroid/UltroidStringSession",
-                ),
-            ],
-        )
-        sys.exit()
-    except events.StopPropagation:
-        raise events.StopPropagation
-    except KeyboardInterrupt:
-        pass
-    except Exception as e:
-        LOGS.exception(e)
+
+            if groups_only and ult.is_private:
+                return await eod(ult, get_string("py_d5"))
+
+            try:
+                await dec(ult)
             except FloodWaitError as fwerr:
                 await asst.send_message(
                     udB.get_key("LOG_CHANNEL"),
                     f"`FloodWaitError:\n{str(fwerr)}\n\nSleeping for {tf((fwerr.seconds + 10)*1000)}`",
                 )
-                await ultroid_bot.disconnect()
+                # await ultroid_bot.disconnect()
                 await asyncio.sleep(fwerr.seconds + 10)
-                await ultroid_bot.connect()
+                # await ultroid_bot.connect()
                 await asst.send_message(
                     udB.get_key("LOG_CHANNEL"),
                     "`Bot is working again`",
@@ -325,17 +258,34 @@ def ultroid_cmd(
                 blacklist_chats=blacklist_chats,
             ),
         )
-        if TAKE_EDITS:
 
-            def func_(x):
-                return not x.via_bot_id and not (x.is_channel and x.chat.broadcast)
+        def _isEdit(x):
+            # is_channel probably refers to megagroup ;_;
+            return not (x.via_bot_id or (x.is_channel and x.chat.broadcast))
 
+        if TAKE_SUDO_EDITS and allow_sudo:
+            if pattern:
+                cmd = compile_pattern(pattern, SUDO_HNDLR)
             ultroid_bot.add_event_handler(
                 wrapp,
                 MessageEdited(
+                    incoming=True,
                     pattern=cmd,
                     forwards=False,
-                    func=func_,
+                    func=_isEdit,
+                    chats=chats,
+                    blacklist_chats=blacklist_chats,
+                ),
+            )
+
+        if TAKE_EDITS and pattern:
+            ultroid_bot.add_event_handler(
+                wrapp,
+                MessageEdited(
+                    outgoing=True,
+                    pattern=cmd,
+                    forwards=False,
+                    func=_isEdit,
                     chats=chats,
                     blacklist_chats=blacklist_chats,
                 ),
@@ -392,6 +342,19 @@ def ultroid_cmd(
                     blacklist_chats=blacklist_chats,
                 ),
             )
+            if TAKE_ASST_EDITS and pattern:
+                asst.add_event_handler(
+                    wrapp,
+                    MessageEdited(
+                        pattern=cmd,
+                        incoming=True,
+                        forwards=False,
+                        func=func,
+                        chats=chats,
+                        blacklist_chats=blacklist_chats,
+                    ),
+                )
+
         file = Path(inspect.stack()[1].filename)
         if "addons/" in str(file):
             if LOADED.get(file.stem):
